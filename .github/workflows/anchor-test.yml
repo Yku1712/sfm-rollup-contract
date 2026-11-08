@@ -26,6 +26,10 @@ jobs:
           avm install latest
           avm use latest
 
+      - name: Generate test keypair
+        run: |
+          solana-keygen new --no-bip39-passphrase --silent --outfile $HOME/.config/solana/id.json
+
       - name: Run Unit Tests
         working-directory: ./programs/sfm-rollup
         run: cargo test
