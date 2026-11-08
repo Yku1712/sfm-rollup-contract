@@ -12,7 +12,8 @@ name = "sfm_rollup"
 default = []
 no-entrypoint = []
 cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+anchor-lang = { version = "=0.32.1", features = ["init-if-needed"] }
 sha2 = "0.10"
