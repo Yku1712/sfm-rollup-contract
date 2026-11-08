@@ -24,22 +24,27 @@ pub mod sfm_rollup {
         proof: Vec<[u8; 32]>,
         root: [u8; 32]
     ) -> Result<bool> {
-        let mut computed_hash = leaf;
-
-        for p in proof {
-            // Sort the pair lexicographically to match standard Merkle tree logic
-            if computed_hash <= p {
-                computed_hash = hashv(&[&computed_hash[..], &p[..]]).to_bytes();
-            } else {
-                computed_hash = hashv(&[&p[..], &computed_hash[..]]).to_bytes();
-            }
-        }
-
-        let is_valid = computed_hash == root;
+        let is_valid = verify_merkle_proof(leaf, proof, root);
         require!(is_valid, RollupError::InvalidProof);
-
         Ok(is_valid)
     }
+}
+
+// Pure function to verify the Merkle Proof
+pub fn verify_merkle_proof(
+    leaf: [u8; 32],
+    proof: Vec<[u8; 32]>,
+    root: [u8; 32]
+) -> bool {
+    let mut computed_hash = leaf;
+    for p in proof {
+        if computed_hash <= p {
+            computed_hash = hashv(&[&computed_hash[..], &p[..]]).to_bytes();
+        } else {
+            computed_hash = hashv(&[&p[..], &computed_hash[..]]).to_bytes();
+        }
+    }
+    computed_hash == root
 }
 
 #[derive(Accounts)]
@@ -75,4 +80,44 @@ pub struct RollupState {
 pub enum RollupError {
     #[msg("The provided Merkle proof is invalid.")]
     InvalidProof,
+}
+
+// UNIT TESTS
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_merkle_proof() {
+        // Construct a dummy tree of 4 leaves (A, B, C, D)
+        let leaf_a = hashv(&[b"A"]).to_bytes();
+        let leaf_b = hashv(&[b"B"]).to_bytes();
+        let leaf_c = hashv(&[b"C"]).to_bytes();
+        let leaf_d = hashv(&[b"D"]).to_bytes();
+
+        // Level 1: AB and CD
+        let node_ab = hashv(&[&leaf_a[..], &leaf_b[..]]).to_bytes();
+        let node_cd = hashv(&[&leaf_c[..], &leaf_d[..]]).to_bytes();
+
+        // Level 2: Root (ABCD)
+        let root = hashv(&[&node_ab[..], &node_cd[..]]).to_bytes();
+
+        // Proof for Leaf A: [Leaf B, Node CD]
+        let proof_for_a = vec![leaf_b, node_cd];
+
+        // 1. Verify valid proof
+        assert_eq!(
+            verify_merkle_proof(leaf_a, proof_for_a.clone(), root),
+            true,
+            "Valid proof should return true"
+        );
+
+        // 2. Verify invalid proof (tampering with leaf)
+        let fake_leaf = hashv(&[b"FAKE"]).to_bytes();
+        assert_eq!(
+            verify_merkle_proof(fake_leaf, proof_for_a, root),
+            false,
+            "Fake leaf should return false"
+        );
+    }
 }
