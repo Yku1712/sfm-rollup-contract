@@ -1,0 +1,18 @@
+[package]
+name = "sfm-rollup"
+version = "0.1.0"
+description = "Merkle Root Verifier for SFM Rollup"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "sfm_rollup"
+
+[features]
+default = []
+no-entrypoint = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+solana-program = "2.2.2"
