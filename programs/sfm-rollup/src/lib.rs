@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hashv;
+use sha2::{Sha256, Digest};
 
 // Valid Base58 dummy ID for compilation purposes
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -30,6 +30,21 @@ pub mod sfm_rollup {
     }
 }
 
+// Helper: SHA-256 of two 32-byte hashes concatenated (raw bytes)
+fn sha256_pair(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(a);
+    hasher.update(b);
+    hasher.finalize().into()
+}
+
+// Helper: SHA-256 of arbitrary data
+fn sha256_bytes(data: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hasher.finalize().into()
+}
+
 // Pure function to verify the Merkle Proof
 pub fn verify_merkle_proof(
     leaf: [u8; 32],
@@ -39,9 +54,9 @@ pub fn verify_merkle_proof(
     let mut computed_hash = leaf;
     for p in proof {
         if computed_hash <= p {
-            computed_hash = hashv(&[&computed_hash[..], &p[..]]).to_bytes();
+            computed_hash = sha256_pair(&computed_hash, &p);
         } else {
-            computed_hash = hashv(&[&p[..], &computed_hash[..]]).to_bytes();
+            computed_hash = sha256_pair(&p, &computed_hash);
         }
     }
     computed_hash == root
@@ -90,17 +105,17 @@ mod tests {
     #[test]
     fn test_valid_merkle_proof() {
         // Construct a dummy tree of 4 leaves (A, B, C, D)
-        let leaf_a = hashv(&[b"A"]).to_bytes();
-        let leaf_b = hashv(&[b"B"]).to_bytes();
-        let leaf_c = hashv(&[b"C"]).to_bytes();
-        let leaf_d = hashv(&[b"D"]).to_bytes();
+        let leaf_a = sha256_bytes(b"A");
+        let leaf_b = sha256_bytes(b"B");
+        let leaf_c = sha256_bytes(b"C");
+        let leaf_d = sha256_bytes(b"D");
 
         // Level 1: AB and CD
-        let node_ab = hashv(&[&leaf_a[..], &leaf_b[..]]).to_bytes();
-        let node_cd = hashv(&[&leaf_c[..], &leaf_d[..]]).to_bytes();
+        let node_ab = sha256_pair(&leaf_a, &leaf_b);
+        let node_cd = sha256_pair(&leaf_c, &leaf_d);
 
         // Level 2: Root (ABCD)
-        let root = hashv(&[&node_ab[..], &node_cd[..]]).to_bytes();
+        let root = sha256_pair(&node_ab, &node_cd);
 
         // Proof for Leaf A: [Leaf B, Node CD]
         let proof_for_a = vec![leaf_b, node_cd];
@@ -113,7 +128,7 @@ mod tests {
         );
 
         // 2. Verify invalid proof (tampering with leaf)
-        let fake_leaf = hashv(&[b"FAKE"]).to_bytes();
+        let fake_leaf = sha256_bytes(b"FAKE");
         assert_eq!(
             verify_merkle_proof(fake_leaf, proof_for_a, root),
             false,
