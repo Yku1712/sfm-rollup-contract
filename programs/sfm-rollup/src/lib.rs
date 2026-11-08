@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use solana_program::hash::hashv;
+use anchor_lang::solana_program::hash::hashv;
 
 // Valid Base58 dummy ID for compilation purposes
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
