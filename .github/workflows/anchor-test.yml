@@ -20,12 +20,14 @@ jobs:
           sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      - name: Install Anchor (exact version matching anchor-lang)
+      - name: Install Anchor CLI 0.32.1
         run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --force
-          avm install 0.32.1
-          avm use 0.32.1
+          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.32.1 --force
           anchor --version
+
+      - name: Pin problematic crates to pre-edition2024 versions
+        run: |
+          cargo update -p zeroize --precise 1.7.0 || true
 
       - name: Generate test keypair
         run: |
