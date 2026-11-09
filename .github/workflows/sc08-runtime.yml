@@ -42,9 +42,35 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          cargo install --git https://github.com/coral-xyz/anchor \
+          set -euo pipefail
+
+          rustup toolchain install stable --profile minimal
+
+          echo "=== EXPLICIT RUST TOOLCHAIN ==="
+          rustup run stable rustc --version
+          rustup run stable cargo --version
+
+          echo "=== REQUIRE EDITION 2024 SUPPORT ==="
+          CARGO_VERSION="$(rustup run stable cargo --version)"
+          python3 - "$CARGO_VERSION" <<'CHECK'
+          import re
+          import sys
+          match = re.search(r"cargo (\d+)\.(\d+)\.(\d+)", sys.argv[1])
+          if not match:
+              raise SystemExit("FAIL: CARGO_VERSION_UNKNOWN")
+          major, minor, patch = map(int, match.groups())
+          if (major, minor, patch) < (1, 85, 0):
+              raise SystemExit("FAIL: CARGO_TOO_OLD_FOR_EDITION2024")
+          print("CARGO_EDITION2024_GATE=PASS")
+          CHECK
+
+          echo "=== INSTALL ANCHOR 0.32.1 ==="
+          rustup run stable cargo install \
+            --git https://github.com/coral-xyz/anchor \
             anchor-cli --tag v0.32.1 --locked
+
           anchor --version
+          test "$(anchor --version)" = "anchor-cli 0.32.1"
 
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund
