@@ -1,0 +1,81 @@
+name: SFM SC08 Anchor Runtime Security
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "programs/sfm-rollup/**"
+      - "Anchor.toml"
+      - "tests/runtime.mjs"
+      - "package.json"
+      - ".github/workflows/sc08-runtime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config libssl-dev
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.3.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor \
+            anchor-cli --tag v0.32.1 --locked
+          anchor --version
+
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Configure disposable test identities
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/solana" target/deploy
+          solana-keygen new --silent --no-bip39-passphrase \
+            --outfile "$HOME/.config/solana/id.json"
+          solana-keygen new --silent --no-bip39-passphrase \
+            --outfile target/deploy/sfm_rollup-keypair.json
+
+          AUTHORITY="$(solana-keygen pubkey "$HOME/.config/solana/id.json")"
+          PROGRAM_ID="$(solana-keygen pubkey target/deploy/sfm_rollup-keypair.json)"
+
+          echo "SFM_ROLLUP_INITIAL_AUTHORITY=$AUTHORITY" >> "$GITHUB_ENV"
+          echo "ANCHOR_WALLET=$HOME/.config/solana/id.json" >> "$GITHUB_ENV"
+          echo "ANCHOR_PROVIDER_URL=http://127.0.0.1:8899" >> "$GITHUB_ENV"
+
+          python3 - "$PROGRAM_ID" <<'PY'
+          from pathlib import Path
+          import sys
+          pid = sys.argv[1]
+          old = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+          for name in ("programs/sfm-rollup/src/lib.rs", "Anchor.toml"):
+              p = Path(name)
+              s = p.read_text()
+              assert s.count(old) == 1, name
+              p.write_text(s.replace(old, pid))
+          PY
+
+      - name: Build program for SBF
+        run: anchor build
+
+      - name: Run validator instruction security tests
+        run: anchor test --skip-build
