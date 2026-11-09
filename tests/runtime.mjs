@@ -1,4 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
+import BN from "bn.js";
 import {
   Keypair,
   PublicKey,
@@ -67,7 +68,7 @@ async function mustReject(fn, name, expectedCode = null) {
 
 function submit(root, signer, count = 1) {
   return program.methods
-    .submitBatch(root, new anchor.BN(count))
+    .submitBatch(root, new BN(count))
     .accounts({
       authority: signer.publicKey,
       rollupState: statePda,
