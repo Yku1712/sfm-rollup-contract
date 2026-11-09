@@ -2,6 +2,9 @@ name: SFM SC08 Anchor Runtime Security
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - audit/sc09-anchor-runtime
   pull_request:
     paths:
       - "programs/sfm-rollup/**"
